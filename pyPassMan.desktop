@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=pyPassMan
+Comment=A Gtk3 password manager
+Exec=pyPassManGtk3
+Terminal=false
+Type=Application
+Icon=sonata
+Categories=GTK;
+StartupNotify=true

@@ -63,6 +63,9 @@ class MainWindow(Gtk.Window):
         copy_password = Gtk.Button('Copy password', image=Gtk.Image(stock=Gtk.STOCK_COPY))
         copy_password.connect('clicked', self.on_copy_button_clicked)
         copy_password.set_sensitive(False)
+        edit_record = Gtk.Button('Edit', image=Gtk.Image(stock=Gtk.STOCK_EDIT))
+        edit_record.connect('clicked', self.on_edit_clicked)
+        edit_record.set_sensitive(False)
         delete_record = Gtk.Button('Delete', image=Gtk.Image(stock=Gtk.STOCK_DELETE))
         delete_record.connect('clicked', self.on_delete_button_clicked)
         delete_record.set_sensitive(False)
@@ -70,6 +73,7 @@ class MainWindow(Gtk.Window):
         # save to disable/enable at will
         self.copy_password = copy_password
         self.delete_record = delete_record
+        self.edit_record = edit_record
 
         # Make our treelist scrollable
         swH = Gtk.ScrolledWindow()
@@ -82,12 +86,28 @@ class MainWindow(Gtk.Window):
         self.grid.attach(swH, 0, 1, 6, 1)
         self.grid.attach(copy_password, 2, 2, 2, 1)
         self.grid.attach(delete_record, 2, 3, 2, 1)
+        self.grid.attach(edit_record, 2, 4, 2, 1)
 
     def on_add_clicked(self, widget):
-        dialog = AddAccountDialog(self)
+        account = models.Account()
+        self._create_and_run_edit_dialog(account)
+
+    def on_edit_clicked(self, widget):
+        selection = self.tree.get_selection()
+        model, paths = selection.get_selected_rows()
+        iter = model.get_iter(paths[0])
+        if iter != None:
+            id = model[iter][0]
+            account = self.AccountManager.load(id)
+        self._create_and_run_edit_dialog(account)
+
+    def _create_and_run_edit_dialog(self, account):
+        dialog = EditAccountDialog(self, account)
+        self._run_edit_dialog(dialog, account)
+
+    def _run_edit_dialog(self, dialog, account):
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
-            values = {}
             missing = False
             for key, part in dialog.form_parts.items():
                 input_val = part.input.get_text()
@@ -96,20 +116,18 @@ class MainWindow(Gtk.Window):
                     part.input.modify_bg(Gtk.StateFlags.NORMAL, self.COLOR_INVALID)
                 else:
                     part.input.modify_bg(Gtk.StateFlags.NORMAL, None)
-                values[key] = input_val
+                setattr(account, key, input_val)
             if missing:
-                return
-
-            account = models.Account(**values)
+                return self._run_edit_dialog(dialog, account)
 
             try:
                 self.AccountManager.save(account)
                 self.store.append([account.id, account.title, account.username])
-                dialog.destroy()
             except Exception as err:
                 print(err)
-        else:
-            dialog.destroy()
+                return self._run_edit_dialog(dialog, account)
+
+        dialog.destroy()
 
     def on_about_clicked(self, widget):
         dialog = AboutDialog(self)
@@ -135,16 +153,21 @@ class MainWindow(Gtk.Window):
 
     def on_tree_selection_changed(self, widget):
         model, treeiter = widget.get_selected()
-        self.copy_password.set_sensitive(True if treeiter != None else False)
-        self.delete_record.set_sensitive(True if treeiter != None else False)
+        is_sensitive = True if treeiter != None else False
+        self.copy_password.set_sensitive(is_sensitive)
+        self.delete_record.set_sensitive(is_sensitive)
+        self.edit_record.set_sensitive(is_sensitive)
         self.selected = widget
 
-class AddAccountDialog(Gtk.Dialog):
+class EditAccountDialog(Gtk.Dialog):
 
     form_parts = dict(title=None, username=None, password=None)
+    _account = None
 
-    def __init__(self, parent):
-        Gtk.Dialog.__init__(self, "Add", parent,
+    def __init__(self, parent, account):
+        self._account = account
+
+        Gtk.Dialog.__init__(self, "Add" if self._account.id is not None else 'Edit', parent,
             Gtk.DialogFlags.MODAL, buttons=(
             Gtk.STOCK_SAVE, Gtk.ResponseType.OK,
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
@@ -166,6 +189,11 @@ class AddAccountDialog(Gtk.Dialog):
             part.input.set_activates_default(True)
             if l == 'title':
                 part.input.set_tooltip_text('Could be the name of an app, or a domain name')
+            if l == 'password':
+                part.input.set_visibility(False)
+            value = getattr(self._account, l)
+            if value is not None:
+                part.input.set_text(value)
 
             # Save the part for processing in submit callbacks.
             self.form_parts[l] = part

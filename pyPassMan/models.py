@@ -92,9 +92,9 @@ class Account:
 
     def __init__(self, **kwargs):
         self.id = kwargs.get('id', None)
-        self.title = kwargs.get('title')
-        self.username = kwargs.get('username')
-        self.password = kwargs.get('password')
+        self.title = kwargs.get('title', '')
+        self.username = kwargs.get('username', '')
+        self.password = kwargs.get('password', '')
 
 
 Field = collections.namedtuple('Field', 'label input')

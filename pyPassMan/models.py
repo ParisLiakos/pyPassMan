@@ -62,10 +62,14 @@ class AccountManager:
     def save(self, account):
         cursor = self._conn.cursor()
         if account.id is None:
-          values = (None, account.title, account.username, self._aes.encrypt(account.password));
-          cursor.execute('INSERT INTO accounts VALUES(?, ?, ?, ?)', values)
-          account.id = cursor.lastrowid
-          self._conn.commit()
+            values = (None, account.title, account.username, self._aes.encrypt(account.password));
+            cursor.execute('INSERT INTO accounts VALUES(?, ?, ?, ?)', values)
+            account.id = cursor.lastrowid
+        else:
+            values = (account.title, account.username, self._aes.encrypt(account.password), account.id);
+            cursor.execute('UPDATE accounts SET title = ?, username = ?, password = ? WHERE id = ?', values)
+
+        self._conn.commit()
 
         return True
 

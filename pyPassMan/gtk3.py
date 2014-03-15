@@ -1,18 +1,41 @@
 #!/usr/bin/python3
 
 from gi.repository import Gtk, Gdk
-import sqlite3
+import hashlib
 import pyPassMan.models as models
 
 class MainWindow(Gtk.Window):
 
+    initialized = False
     COLOR_INVALID = Gdk.Color(50000, 0, 0)
 
     def __init__(self):
-        Gtk.Window.__init__(self, title="Password Manager")
         self.settings = models.Settings()
-        self.AccountManager = models.AccountManager(sqlite3.connect(self.settings.get_db_path()), models.AESCipher(self.settings.master_pass))
-        self._build()
+        Gtk.Window.__init__(self, title="Password Manager")
+
+        key = self.show_master_password_dialog()
+        if key is None:
+            self.close()
+        else:
+            self.AccountManager = models.AccountManager(self.settings.get_db_path(), models.AESCipher(key))
+            self._build()
+            self.initialized = True
+
+    def show_master_password_dialog(self):
+        dialog = MasterKeyInputDialog(self)
+        correct = False
+        master_pass = None
+        while not correct:
+            response = dialog.run()
+            if response == Gtk.ResponseType.OK:
+                master_pass = dialog.master_pass_input.get_text()
+                if hashlib.sha512(master_pass.encode('utf-8')).hexdigest() == self.settings.master_pass:
+                    correct = True
+                    dialog.destroy()
+            else:
+                dialog.destroy()
+                break
+        return None if not correct else master_pass
 
     def _build(self):
         self.set_icon(self.render_icon(Gtk.STOCK_DIALOG_AUTHENTICATION, Gtk.IconSize.MENU))
@@ -145,6 +168,7 @@ class MainWindow(Gtk.Window):
         if response == Gtk.ResponseType.OK:
             new_master_pass = dialog.form_parts['master_pass'].input.get_text()
             if new_master_pass and new_master_pass is not self.settings.master_pass:
+                new_master_pass = hashlib.sha512(new_master_pass.encode('utf-8')).hexdigest()
                 self.AccountManager.update_all(models.AESCipher(new_master_pass))
                 self.settings.master_pass = new_master_pass
                 self.settings.write()
@@ -250,12 +274,11 @@ class PreferencesDialog(Gtk.Dialog):
         labels_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         inputs_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
 
-        master_pass = models.Field(Gtk.Label('Master password'), Gtk.Entry())
+        master_pass = models.Field(Gtk.Label('Change Master password'), Gtk.Entry())
         master_pass.label.set_alignment(0, 0)
         master_pass.input.set_activates_default(True)
         master_pass.input.set_visibility(False)
         master_pass.input.set_tooltip_text('A length of 16 characters is recommended')
-        master_pass.input.set_text(settings.master_pass)
         # Save the part for processing in submit callbacks.
         self.form_parts['master_pass'] = master_pass
 
@@ -268,11 +291,37 @@ class PreferencesDialog(Gtk.Dialog):
         box.add(hbox)
 
 
+class MasterKeyInputDialog(Gtk.Dialog):
+
+    def __init__(self, parent):
+
+        Gtk.Dialog.__init__(self, 'Enter the master password', parent,
+            Gtk.DialogFlags.MODAL, buttons=(
+            Gtk.STOCK_OK, Gtk.ResponseType.OK))
+
+        self._build(parent.settings)
+        self.show_all()
+        self.set_default_response(Gtk.ResponseType.OK)
+
+    def _build(self, settings):
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        master_pass_input =  Gtk.Entry()
+        master_pass_input.set_activates_default(True)
+        master_pass_input.set_visibility(False)
+        # Save the part for processing in submit callbacks.
+        self.master_pass_input = master_pass_input
+
+        vbox.pack_start(master_pass_input, True, True, 20)
+
+        self.get_content_area().add(vbox)
+
 def main ():
     win = MainWindow()
-    win.connect("delete-event", Gtk.main_quit)
-    win.show_all()
-    Gtk.main()
+    if win.initialized:
+        win.connect("delete-event", Gtk.main_quit)
+        win.show_all()
+        Gtk.main()
 
 if __name__ == "__main__":
     main()

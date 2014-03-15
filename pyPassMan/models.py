@@ -37,8 +37,8 @@ class AccountManager:
     _con = None
     _aes = None
 
-    def __init__(self, conn, aes_cipher):
-        self._conn = conn
+    def __init__(self, conn_path, aes_cipher):
+        self._conn = sqlite3.connect(conn_path)
         self._aes = aes_cipher
 
         # check if db is set

@@ -10,7 +10,8 @@ class MainWindow(Gtk.Window):
 
     def __init__(self):
         Gtk.Window.__init__(self, title="Password Manager")
-        self.AccountManager = models.AccountManager(sqlite3.connect('passwords.db'), models.AESCipher('SUPERSTRONGKEY12'))
+        self.settings = models.Settings()
+        self.AccountManager = models.AccountManager(sqlite3.connect(self.settings.get_db_path()), models.AESCipher(self.settings.master_pass))
         self._build()
 
     def _build(self):
@@ -31,9 +32,13 @@ class MainWindow(Gtk.Window):
         button_add.connect('clicked', self.on_add_clicked)
         toolbar.insert(button_add, 0)
 
+        button_preferences = Gtk.ToolButton.new_from_stock(Gtk.STOCK_PREFERENCES)
+        button_preferences.connect('clicked', self.on_preferences_clicked)
+        toolbar.insert(button_preferences, 1)
+
         button_about = Gtk.ToolButton.new_from_stock(Gtk.STOCK_ABOUT)
         button_about.connect('clicked', self.on_about_clicked)
-        toolbar.insert(button_about, 1)
+        toolbar.insert(button_about, 2)
 
     def _create_list(self):
         store = Gtk.ListStore(int, str, str)
@@ -134,6 +139,17 @@ class MainWindow(Gtk.Window):
         response = dialog.run()
         dialog.destroy()
 
+    def on_preferences_clicked(self, widget):
+        dialog = PreferencesDialog(self)
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            new_master_pass = dialog.form_parts['master_pass'].input.get_text()
+            if new_master_pass and new_master_pass is not self.settings.master_pass:
+                self.AccountManager.update_all(models.AESCipher(new_master_pass))
+                self.settings.master_pass = new_master_pass
+                self.settings.write()
+        dialog.destroy()
+
     def on_copy_button_clicked(self, widget):
         model, treeiter = self.selected.get_selected()
         if treeiter != None:
@@ -211,6 +227,46 @@ class AboutDialog(Gtk.AboutDialog):
 
     def __init__(self, parent):
         Gtk.Dialog.__init__(self, 'About me', parent, version=0.1, program_name='Password Manager', website='https://github.com/ParisLiakos/pyPassMan', authors=['Paris Liakos'], copyright='(c) 2014 Paris Liakos', comments='A GTK3 password manager app writen in Python3', logo=None)
+
+class PreferencesDialog(Gtk.Dialog):
+
+    form_parts = dict(master_pass=None)
+
+    def __init__(self, parent):
+
+        Gtk.Dialog.__init__(self, 'Preferences', parent,
+            Gtk.DialogFlags.MODAL, buttons=(
+            Gtk.STOCK_SAVE, Gtk.ResponseType.OK,
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
+
+        self._build(parent.settings)
+        self.show_all()
+        self.set_default_response(Gtk.ResponseType.OK)
+
+    def _build(self, settings):
+        box = self.get_content_area()
+
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        labels_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        inputs_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        master_pass = models.Field(Gtk.Label('Master password'), Gtk.Entry())
+        master_pass.label.set_alignment(0, 0)
+        master_pass.input.set_activates_default(True)
+        master_pass.input.set_visibility(False)
+        master_pass.input.set_tooltip_text('A length of 16 characters is recommended')
+        master_pass.input.set_text(settings.master_pass)
+        # Save the part for processing in submit callbacks.
+        self.form_parts['master_pass'] = master_pass
+
+        labels_box.pack_start(master_pass.label, False, False, 5)
+        inputs_box.pack_start(master_pass.input, False, False, 5)
+
+        hbox.pack_start(labels_box, False, False, 20)
+        hbox.pack_start(inputs_box, True, True, 20)
+
+        box.add(hbox)
+
 
 def main ():
     win = MainWindow()

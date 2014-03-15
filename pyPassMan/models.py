@@ -3,6 +3,8 @@ import base64
 from Crypto import Random
 from Crypto.Cipher import AES
 import sqlite3
+import configparser
+import os
 
 class AESCipher:
 
@@ -77,6 +79,16 @@ class AccountManager:
         self._conn.cursor().execute('DELETE FROM accounts WHERE id=?', (int(id),))
         self._conn.commit()
 
+    def update_all(self, aes_cipher):
+        cursor = self._conn.cursor()
+        for account in self.load_all():
+            values = (aes_cipher.encrypt(account.password), account.id);
+            cursor.execute('UPDATE accounts SET password = ? WHERE id = ?', values)
+
+        self._conn.commit()
+        # Now after db records are updated change the reference.
+        self._aes = aes_cipher
+
     def setup_db(self):
         self._conn.cursor().execute('''CREATE TABLE accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -96,5 +108,36 @@ class Account:
         self.username = kwargs.get('username', '')
         self.password = kwargs.get('password', '')
 
+class Settings:
+
+    path = None
+    master_pass = None
+
+    def __init__(self, path = os.path.expanduser('~/') + '.config/pyPassMan/'):
+        self.path = path
+        self.reload()
+
+    def reload(self):
+        self.config = configparser.ConfigParser()
+        self.config.read(self.get_config_file_path())
+        if 'General' in self.config.sections():
+            self.master_pass = self.config['General']['master_pass']
+        else:
+            self.master_pass = 'SUPERSTRONGPASS12'
+
+    def get_config_file_path(self):
+        return self.path + 'settings.conf'
+
+    def get_db_path(self):
+        return self.path + 'passwords.db'
+
+    def write(self):
+        cfgfile = open(self.get_config_file_path(), 'w')
+        if 'General' not in self.config.sections():
+            self.config.add_section('General')
+        self.config.set('General','master_pass', self.master_pass)
+        self.config.write(cfgfile)
+        cfgfile.close()
+        self.reload()
 
 Field = collections.namedtuple('Field', 'label input')

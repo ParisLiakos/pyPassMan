@@ -16,3 +16,9 @@ Installation
 `# exit`
 
 `$ pyPassManGtk3`
+
+
+Usage
+========
+
+After running for first time, for better security, please set the master password in preferences

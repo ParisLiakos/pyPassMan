@@ -22,6 +22,9 @@ class MainWindow(Gtk.Window):
             self.initialized = True
 
     def show_master_password_dialog(self):
+        if self.settings.master_pass is None:
+            return ''
+
         dialog = MasterKeyInputDialog(self)
         correct = False
         master_pass = None

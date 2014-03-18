@@ -38,6 +38,9 @@ class AccountManager:
     _aes = None
 
     def __init__(self, conn_path, aes_cipher):
+        conn_dir = os.path.dirname(conn_path)
+        if not os.path.isdir(conn_dir):
+            os.makedirs(conn_dir)
         self._conn = sqlite3.connect(conn_path)
         self._aes = aes_cipher
 

@@ -253,7 +253,7 @@ class EditAccountDialog(Gtk.Dialog):
 class AboutDialog(Gtk.AboutDialog):
 
     def __init__(self, parent):
-        Gtk.Dialog.__init__(self, 'About me', parent, version=0.1, program_name='Password Manager', website='https://github.com/ParisLiakos/pyPassMan', authors=['Paris Liakos'], copyright='(c) 2014 Paris Liakos', comments='A GTK3 password manager app writen in Python3', logo=None)
+        Gtk.Dialog.__init__(self, 'About pyPassMan', parent, version=0.1, program_name='Password Manager', website='https://github.com/ParisLiakos/pyPassMan', authors=['Paris Liakos'], copyright='(c) 2014 Paris Liakos', comments='A GTK3 password manager app writen in Python3', logo=None)
 
 class PreferencesDialog(Gtk.Dialog):
 
